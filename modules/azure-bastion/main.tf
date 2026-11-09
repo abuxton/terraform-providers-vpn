@@ -39,6 +39,7 @@ module "azure_bastion" {
   scale_units        = var.scale_units
   tunneling_enabled  = var.tunneling_enabled
   ip_connect_enabled = var.ip_connect_enabled
+  zones              = coalesce(azurerm_public_ip.bastion.zones, toset([]))
 
   ip_configuration = {
     name                 = "${var.name}-ipconfig"
