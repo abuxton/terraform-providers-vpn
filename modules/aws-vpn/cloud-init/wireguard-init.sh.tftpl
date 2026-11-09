@@ -1,0 +1,48 @@
+#!/bin/bash
+# Personal WireGuard VPN bootstrap (Ubuntu 22.04 / 24.04).
+# Rendered by Terraform's templatefile(); $${...} placeholders are substituted
+# at plan/apply time, everything else is plain shell executed on first boot.
+set -euo pipefail
+
+exec > >(tee /var/log/wireguard-init.log) 2>&1
+echo "=== WireGuard bootstrap starting $(date -u) ==="
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y wireguard wireguard-tools qrencode iptables-persistent
+
+install -d -m 700 /etc/wireguard
+
+SERVER_PRIVATE_KEY="${wg_server_private_key}"
+if [ -z "$SERVER_PRIVATE_KEY" ]; then
+  echo "No server private key supplied - generating one on first boot."
+  SERVER_PRIVATE_KEY="$(wg genkey)"
+fi
+echo "$SERVER_PRIVATE_KEY" > /etc/wireguard/server_private.key
+chmod 600 /etc/wireguard/server_private.key
+wg pubkey < /etc/wireguard/server_private.key > /etc/wireguard/server_public.key
+
+# Detect the primary egress interface for NAT/MASQUERADE rules.
+EGRESS_IF="$(ip route show default | awk '/default/ {print $5; exit}')"
+
+cat > /etc/wireguard/wg0.conf <<EOF
+[Interface]
+Address = ${wg_server_address}
+ListenPort = ${wg_server_port}
+PrivateKey = $SERVER_PRIVATE_KEY
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o $EGRESS_IF -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o $EGRESS_IF -j MASQUERADE
+
+${wg_peers_block}
+EOF
+chmod 600 /etc/wireguard/wg0.conf
+
+echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-wireguard.conf
+echo "net.ipv6.conf.all.forwarding=1" >> /etc/sysctl.d/99-wireguard.conf
+sysctl -p /etc/sysctl.d/99-wireguard.conf
+
+systemctl enable wg-quick@wg0
+systemctl restart wg-quick@wg0
+
+echo "=== WireGuard bootstrap complete $(date -u) ==="
+echo "Server public key: $(cat /etc/wireguard/server_public.key)"
