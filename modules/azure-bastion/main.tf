@@ -8,6 +8,10 @@
 # Standard public IP, and wraps Microsoft's official Azure Verified Module.
 #
 # Registry: https://registry.terraform.io/modules/Azure/avm-res-network-bastionhost/azurerm
+data "azurerm_resource_group" "bastion" {
+  name = var.resource_group_name
+}
+
 resource "azurerm_subnet" "bastion" {
   name                 = "AzureBastionSubnet" # name is mandatory and fixed by Azure
   resource_group_name  = var.resource_group_name
@@ -26,19 +30,20 @@ resource "azurerm_public_ip" "bastion" {
 
 module "azure_bastion" {
   source  = "Azure/avm-res-network-bastionhost/azurerm"
-  version = "~> 0.9"
+  version = "0.9.0"
 
-  name                = var.name
-  resource_group_name = var.resource_group_name
-  location            = var.location
-  sku                 = var.sku
-  scale_units         = var.scale_units
-  tunneling_enabled   = var.tunneling_enabled
-  ip_connect_enabled  = var.ip_connect_enabled
+  name               = var.name
+  parent_id          = data.azurerm_resource_group.bastion.id
+  location           = var.location
+  sku                = var.sku
+  scale_units        = var.scale_units
+  tunneling_enabled  = var.tunneling_enabled
+  ip_connect_enabled = var.ip_connect_enabled
 
   ip_configuration = {
     name                 = "${var.name}-ipconfig"
     subnet_id            = azurerm_subnet.bastion.id
+    create_public_ip     = false
     public_ip_address_id = azurerm_public_ip.bastion.id
   }
 

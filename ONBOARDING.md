@@ -3,7 +3,7 @@
 This guided path takes a new user from repository orientation to safely using and maintaining the Terraform modules. Complete the stages in order; each stage has five challenges and a verification checkpoint.
 
 > [!IMPORTANT]
-> The deployable modules are `aws-vpn` and `aws-bastion`. Do not deploy `azure-bastion` until its upstream Azure Verified Module interface mismatch is fixed. The Azure and GCP VPN directories contain templates only.
+> The deployable modules are `aws-vpn`, `aws-bastion`, and `azure-bastion`. The Azure and GCP VPN directories contain templates only.
 
 ## Before you start
 
@@ -69,12 +69,14 @@ Set `create_dns_record = true` only when you also provide a hosted-zone ID and a
    terraform -chdir=modules/aws-vpn validate
    terraform -chdir=modules/aws-bastion init -backend=false
    terraform -chdir=modules/aws-bastion validate
+   terraform -chdir=modules/azure-bastion init -backend=false
+   terraform -chdir=modules/azure-bastion validate
    ```
 
 5. Update `README.md` and `Project_Architecture_Blueprint.md` whenever a public module contract or support status changes.
 
 > [!NOTE]
-> At present, repository-wide formatting reports an existing issue in `modules/aws-bastion/main.tf`. The AWS modules otherwise validate. The Azure module fails validation because of its upstream interface mismatch.
+> At present, repository-wide formatting reports an existing issue in `modules/aws-bastion/main.tf`. The modules otherwise validate.
 
 **Checkpoint:** Your change preserves module boundaries, has no unreviewed ingress or IAM expansion, and validates for the module you changed.
 
