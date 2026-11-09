@@ -78,9 +78,9 @@ The upstream module owns the detailed implementation: a single-instance Auto Sca
 
 `modules/azure-bastion` creates an `AzureBastionSubnet` and a Standard static public IP, then supplies them to the Azure Verified Module (AVM) Bastion wrapper. It models Azure Bastion as a managed jump-host service rather than an SSH-accessible VM.
 
-The module is currently **not deployable**. With the resolved AVM interface, Terraform requires `parent_id` and rejects `resource_group_name` in the wrapper module call. This is a dependency-interface mismatch, not a caller configuration error. The `virtual_network_id` input is also declared but is not consumed by the current implementation.
+The module derives the AVM `parent_id` from the caller-supplied resource-group name and passes its wrapper-owned public IP with `create_public_ip = false`. This keeps responsibility for the subnet and public IP in the wrapper while using the AVM 0.9.0 interface.
 
-**Required evolution:** update the AVM module invocation to its compatible input interface, validate it independently, and only then describe it as a supported module. Do not paper over the mismatch with undocumented caller inputs.
+The `virtual_network_id` input is declared but is not consumed by the current implementation.
 
 ### Template-only and reserved directories
 
@@ -124,7 +124,7 @@ terraform -chdir=modules/aws-bastion init -backend=false
 terraform -chdir=modules/aws-bastion validate
 ```
 
-At blueprint generation time, the AWS modules validate successfully. Repository-wide `terraform fmt -check -recursive` fails because `modules/aws-bastion/main.tf` is not formatted. The Azure module fails validation for the AVM interface mismatch described above.
+At blueprint generation time, the AWS modules validate successfully. Repository-wide `terraform fmt -check -recursive` fails because `modules/aws-bastion/main.tf` is not formatted.
 
 ## Blueprint for future development
 

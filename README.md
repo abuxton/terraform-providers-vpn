@@ -6,7 +6,7 @@ Reusable Terraform modules for personal VPN and bastion access across AWS and Az
 | --- | --- | --- |
 | [`aws-vpn`](./modules/aws-vpn) | An Ubuntu WireGuard server, security group, and optional Elastic IP | Terraform >= 1.5; AWS provider >= 4.0, < 6.0 |
 | [`aws-bastion`](./modules/aws-bastion) | An SSH bastion behind a load balancer, with session logs and authorized keys stored in S3 | Terraform >= 1.5; AWS provider >= 4.0, < 6.0 |
-| [`azure-bastion`](./modules/azure-bastion) | Azure Bastion composition; currently requires an upstream-interface update | Terraform >= 1.9; AzureRM provider ~> 4.10 |
+| [`azure-bastion`](./modules/azure-bastion) | An Azure Bastion host with its dedicated subnet and static public IP | Terraform >= 1.9; AzureRM provider ~> 4.10 |
 
 > [!IMPORTANT]
 > These modules create infrastructure but do not configure cloud-provider credentials, virtual networks, subnets, or key pairs. Supply those from your root Terraform configuration.
@@ -70,14 +70,23 @@ module "bastion" {
 
 Use public load-balancer subnets when `is_lb_private` is `false` (the default). Set `create_dns_record` with `hosted_zone_id` and `bastion_record_name` to create a Route 53 record. Outputs include the bastion DNS name, security groups for the bastion and private instances, and the log bucket name.
 
-### Azure Bastion (currently unavailable)
+### Azure Bastion
 
-The Azure module is intended to create the required `AzureBastionSubnet`, a Standard static public IP, and an Azure Verified Module Bastion host with native client tunneling and IP connect enabled by default.
+The Azure module creates the required `AzureBastionSubnet`, a Standard static public IP, and an Azure Verified Module Bastion host. Native client tunneling and IP connect are enabled by default.
 
-> [!CAUTION]
-> The currently constrained Azure Verified Module interface requires `parent_id` and rejects this module's `resource_group_name` argument, so `terraform validate` fails. Update the wrapper to the compatible upstream interface before using this module.
+```hcl
+module "bastion" {
+  source = "./modules/azure-bastion"
 
-When the interface is updated, the dedicated subnet prefix must be `/26` or larger. The module declares inputs for the existing resource group and virtual network, location, SKU, scale units, and tunneling features.
+  resource_group_name            = "rg-personal-network"
+  location                       = "eastus"
+  virtual_network_id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-personal-network/providers/Microsoft.Network/virtualNetworks/vnet-personal"
+  virtual_network_name           = "vnet-personal"
+  bastion_subnet_address_prefix = "10.0.255.0/26"
+}
+```
+
+The subnet prefix must be `/26` or larger. Choose the `Standard` or `Premium` SKU to use native client tunneling. Outputs include the Bastion resource ID, DNS name, and public IP address.
 
 ## Module inputs
 
@@ -93,9 +102,12 @@ terraform -chdir=modules/aws-vpn validate
 
 terraform -chdir=modules/aws-bastion init -backend=false
 terraform -chdir=modules/aws-bastion validate
+
+terraform -chdir=modules/azure-bastion init -backend=false
+terraform -chdir=modules/azure-bastion validate
 ```
 
-The Azure Bastion module currently does not validate; see its status above. Use `terraform fmt -check -recursive` to verify formatting across all module files.
+Use `terraform fmt -check -recursive` to verify formatting across all module files.
 
 ## Repository layout
 
@@ -103,11 +115,11 @@ The Azure Bastion module currently does not validate; see its status above. Use 
 modules/
 ├── aws-vpn/       # Deployable WireGuard VPN module
 ├── aws-bastion/   # Deployable SSH bastion module
-├── azure-bastion/ # Azure Bastion wrapper requiring an upstream-interface update
+├── azure-bastion/ # Deployable Azure Bastion module
 ├── azure-vpn/     # WireGuard cloud-init template only
 ├── gcp-vpn/       # WireGuard cloud-init template only
 └── gcp-bastion/   # Reserved; no module implementation yet
 ```
 
 > [!NOTE]
-> `azure-bastion` requires an upstream-interface update before deployment. `azure-vpn` and `gcp-vpn` contain cloud-init templates only, and `gcp-bastion` has no implementation. None is a deployable Terraform module at this time.
+> `azure-vpn` and `gcp-vpn` contain cloud-init templates only, and `gcp-bastion` has no implementation. They are not deployable Terraform modules at this time.
